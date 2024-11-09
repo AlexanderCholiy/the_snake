@@ -7,32 +7,52 @@ from app.read_game_record import read_game_record
 from app.write_game_result import write_game_result
 
 # Константы с типом данных:
-TUPLE_TWO_INT = tuple[int, int]
-TUPLE_THREE_INT = tuple[int, int, int]
+POINTER_POSITION = tuple[int, int]
+POINTER_COLOR = tuple[int, int, int]
 
-# Константы для размеров поля и сетки:
+# Константы для размеров поля, сетки и центра экрана:
 SCREEN_WIDTH: int = 640
 SCREEN_HEIGHT: int = 480
+SCREEN_CENTER_POSITION: POINTER_POSITION = (
+    SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2
+)
 GRID_SIZE: int = 20
 GRID_WIDTH: int = SCREEN_WIDTH // GRID_SIZE
 GRID_HEIGHT: int = SCREEN_HEIGHT // GRID_SIZE
+TOTAL_CELLS = GRID_WIDTH * GRID_HEIGHT
 
 # Направления движения:
-UP: TUPLE_TWO_INT = (0, -1)
-DOWN: TUPLE_TWO_INT = (0, 1)
-LEFT: TUPLE_TWO_INT = (-1, 0)
-RIGHT: TUPLE_TWO_INT = (1, 0)
+UP: POINTER_POSITION = (0, -1)
+DOWN: POINTER_POSITION = (0, 1)
+LEFT: POINTER_POSITION = (-1, 0)
+RIGHT: POINTER_POSITION = (1, 0)
 
 # Константы цветов:
-BOARD_BACKGROUND_COLOR: TUPLE_THREE_INT = (51, 51, 51)
-BORDER_COLOR: TUPLE_THREE_INT = (204, 204, 204)
-GAME_OBJECT_COLOR: TUPLE_THREE_INT = (0, 0, 0)
-APPLE_COLOR: TUPLE_THREE_INT = (220, 20, 60)
-SNAKE_COLOR: TUPLE_THREE_INT = (34, 139, 34)
+BOARD_BACKGROUND_COLOR: POINTER_COLOR = (51, 51, 51)
+BORDER_COLOR: POINTER_COLOR = (204, 204, 204)
+GAME_OBJECT_COLOR: POINTER_COLOR = (0, 0, 0)
+APPLE_COLOR: POINTER_COLOR = (220, 20, 60)
+SNAKE_COLOR: POINTER_COLOR = (34, 139, 34)
+VICTORY_TEXT_COLOR: POINTER_COLOR = (255, 0, 255)
+RECORD_TEXT_COLOR: POINTER_COLOR = (255, 255, 0)
 
 # Скорость движения змейки:
-SPEED: int = 10
+SPEED: int = 20
 
+# Задержка уведомлений (миллисекунды):
+NOTIFICATION_DELAY: int = 3000
+
+# Словарь с возможными движениями змейки:
+GAME_CONTROL = {
+    (UP, pygame.K_LEFT): LEFT,
+    (UP, pygame.K_RIGHT): RIGHT,
+    (DOWN, pygame.K_LEFT): LEFT,
+    (DOWN, pygame.K_RIGHT): RIGHT,
+    (LEFT, pygame.K_UP): UP,
+    (LEFT, pygame.K_DOWN): DOWN,
+    (RIGHT, pygame.K_UP): UP,
+    (RIGHT, pygame.K_DOWN): DOWN,
+}
 
 # Настройка игрового окна:
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), 0, 32)
@@ -58,8 +78,8 @@ class GameObject:
 
     def __init__(
         self,
-        body_color: TUPLE_THREE_INT = GAME_OBJECT_COLOR,
-        position: TUPLE_TWO_INT = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
+        body_color: POINTER_COLOR = GAME_OBJECT_COLOR,
+        position: POINTER_POSITION = SCREEN_CENTER_POSITION
     ):
         """
         Parameters
@@ -89,10 +109,8 @@ class Apple(GameObject):
 
     def __init__(
         self,
-        body_color: TUPLE_THREE_INT = APPLE_COLOR,
-        occupied_positions: list[TUPLE_TWO_INT] = [
-            (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
-        ]
+        body_color: POINTER_COLOR = APPLE_COLOR,
+        occupied_positions: Optional[list[POINTER_POSITION]] = None
     ):
         """
         Parameters
@@ -107,10 +125,13 @@ class Apple(GameObject):
             возможных позиций яблока.
         """
         super().__init__(body_color)
-        self.randomize_position(occupied_positions)
+        self.occupied_positions = occupied_positions or [
+            SCREEN_CENTER_POSITION
+        ]
+        self.randomize_position(self.occupied_positions)
 
     def randomize_position(
-        self, occupied_positions: list[TUPLE_TWO_INT]
+        self, occupied_positions: list[POINTER_POSITION]
     ) -> None:
         """
         Устанавливает случайное положение яблока на игровом поле — задаёт
@@ -158,16 +179,14 @@ class Snake(GameObject):
     """
 
     length: int = 1
-    direction: TUPLE_TWO_INT = RIGHT
-    next_direction: Optional[TUPLE_TWO_INT] = None
-    last: Optional[TUPLE_TWO_INT] = None
+    direction: POINTER_POSITION = RIGHT
+    next_direction: Optional[POINTER_POSITION] = None
+    last: Optional[POINTER_POSITION] = None
 
     def __init__(
         self,
-        positions: list[TUPLE_TWO_INT] = [
-            (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
-        ],
-        body_color: TUPLE_THREE_INT = SNAKE_COLOR,
+        positions: Optional[list[POINTER_POSITION]] = None,
+        body_color: POINTER_COLOR = SNAKE_COLOR,
     ):
         """
         Parameters
@@ -179,9 +198,9 @@ class Snake(GameObject):
             Цвет змейки. Задаётся RGB-значением (по умолчанию — зелёный:
             (0, 255, 0)).
         """
-        self.positions = positions
+        self.positions = positions or [SCREEN_CENTER_POSITION]
         self.body_color = body_color
-        super().__init__(body_color=body_color, position=positions[0])
+        super().__init__(body_color=body_color, position=self.positions[0])
 
     def update_direction(self) -> None:
         """Метод обновляет направление движения змейки."""
@@ -205,12 +224,8 @@ class Snake(GameObject):
 
         self.positions.insert(0, new_head_position)
 
-        # Использовать тернарный оператор не получается, т.к. исходная строка
-        # будет больше рекомендуемых 79 символов.
         if self.positions[self.length:]:
             self.last = self.positions.pop()
-        else:
-            None
 
     def draw(self) -> None:
         """Отрисовывает змейку на экране, затирая след."""
@@ -230,7 +245,7 @@ class Snake(GameObject):
             last_rect = pygame.Rect(self.last, (GRID_SIZE, GRID_SIZE))
             pygame.draw.rect(screen, BOARD_BACKGROUND_COLOR, last_rect)
 
-    def get_head_position(self) -> TUPLE_TWO_INT:
+    def get_head_position(self) -> POINTER_POSITION:
         """
         Метод возвращает текущее положение головы змейки (первый элемент в
         списке positions).
@@ -240,9 +255,7 @@ class Snake(GameObject):
     def reset(self) -> None:
         """Метод сбрасывает змейку в начальное состояние."""
         self.length = 1
-        self.positions = [
-            (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
-        ]
+        self.positions = [SCREEN_CENTER_POSITION]
 
 
 def handle_keys(game_object) -> None:
@@ -250,16 +263,6 @@ def handle_keys(game_object) -> None:
     Функция обрабатывает нажатия клавиш, чтобы изменить направление движения
     змейки.
     """
-    GAME_CONTROL = {
-        (UP, pygame.K_LEFT): LEFT,
-        (UP, pygame.K_RIGHT): RIGHT,
-        (DOWN, pygame.K_LEFT): LEFT,
-        (DOWN, pygame.K_RIGHT): RIGHT,
-        (LEFT, pygame.K_UP): UP,
-        (LEFT, pygame.K_DOWN): DOWN,
-        (RIGHT, pygame.K_UP): UP,
-        (RIGHT, pygame.K_DOWN): DOWN,
-    }
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             write_game_result(snake_lenght=game_object.length)
@@ -288,8 +291,6 @@ def main():
 
     snake = Snake()
     apple = Apple(occupied_positions=snake.positions)
-
-    total_cells = (SCREEN_WIDTH // GRID_SIZE) * (SCREEN_HEIGHT // GRID_SIZE)
 
     while True:
         # Очистим экран, заполнив его фоновым цветом (BOARD_BACKGROUND_COLOR).
@@ -323,28 +324,27 @@ def main():
 
             if snake.length > game_record:
                 victory_text = font.render(
-                    f'New record {snake.length} apples!', True, (255, 255, 0)
+                    f'New record {snake.length} apples!', True,
+                    RECORD_TEXT_COLOR
                 )
                 text_rect = victory_text.get_rect(
-                    center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
+                    center=SCREEN_CENTER_POSITION
                 )
                 screen.blit(victory_text, text_rect)
                 pygame.display.update()
-                pygame.time.wait(3000)
+                pygame.time.wait(NOTIFICATION_DELAY)
 
             snake.reset()
 
         # Теоретическая проверка на заполнение змейкой всего поля)
-        if snake.length == total_cells:
+        if snake.length == TOTAL_CELLS:
             write_game_result(snake_lenght=snake.length)
-            victory_text = font.render('Victory!', True, (255, 0, 255))
-            text_rect = victory_text.get_rect(
-                center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
-            )
+            victory_text = font.render('Victory!', True, VICTORY_TEXT_COLOR)
+            text_rect = victory_text.get_rect(center=SCREEN_CENTER_POSITION)
             screen.blit(victory_text, text_rect)
 
             pygame.display.update()
-            pygame.time.wait(3000)
+            pygame.time.wait(NOTIFICATION_DELAY)
             pygame.quit()
             raise SystemExit
 
