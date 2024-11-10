@@ -125,10 +125,7 @@ class Apple(GameObject):
             возможных позиций яблока.
         """
         super().__init__(body_color)
-        self.occupied_positions = occupied_positions or [
-            SCREEN_CENTER_POSITION
-        ]
-        self.randomize_position(self.occupied_positions)
+        self.randomize_position(occupied_positions or [SCREEN_CENTER_POSITION])
 
     def randomize_position(
         self, occupied_positions: list[POINTER_POSITION]
@@ -161,46 +158,44 @@ class Snake(GameObject):
     отдельному сегменту тела змейки. Атрибуты и методы класса обеспечивают
     логику движения, отрисовку, обработку событий (нажата клавиша) и другие
     аспекты поведения змейки в игре.
-
-    Parameters
-    ----------
-    length : int
-        Длина змейки. По умолчанию змейка имеет длину 1.
-    direction: tuple[int, int]
-        Направление движения змейки. По умолчанию змейка движется вправо.
-    next_direction: tuple[int, int]
-        Следующее направление движения, которое будет применено после обработки
-    нажатия клавиши.
-    last: tuple[int, int]
-        Атрибут используется для хранения позиции последнего сегмента змейки
-        перед тем, как он исчезнет (при движении змейки). Это необходимо для
-        «стирания» этого сегмента с игрового поля, чтобы змейка визуально
-        двигалась.
     """
-
-    length: int = 1
-    direction: POINTER_POSITION = RIGHT
-    next_direction: Optional[POINTER_POSITION] = None
-    last: Optional[POINTER_POSITION] = None
 
     def __init__(
         self,
-        positions: Optional[list[POINTER_POSITION]] = None,
-        body_color: POINTER_COLOR = SNAKE_COLOR,
+        body_color: POINTER_COLOR = SNAKE_COLOR
     ):
         """
         Parameters
         ----------
-        positions : list[tuple[[int, int]]]
-            Cписок, содержащий позиции всех сегментов тела змейки. Начальная
-            позиция — центр экрана.
         body_color: tuple[int, int, int]
             Цвет змейки. Задаётся RGB-значением (по умолчанию — зелёный:
             (0, 255, 0)).
+        positions : list[tuple[[int, int]]]
+            Cписок, содержащий позиции всех сегментов тела змейки. Начальная
+            позиция — центр экрана.
+        length : int
+            Длина змейки. По умолчанию змейка имеет длину 1.
+        direction: tuple[int, int]
+            Направление движения змейки. По умолчанию змейка движется вправо.
+        next_direction: tuple[int, int]
+            Следующее направление движения, которое будет применено после
+            обработки нажатия клавиши.
+        last: tuple[int, int]
+            Атрибут используется для хранения позиции последнего сегмента
+            змейки перед тем, как он исчезнет (при движении змейки). Это
+            необходимо для «стирания» этого сегмента с игрового поля, чтобы
+            змейка визуально двигалась.
         """
-        self.positions = positions or [SCREEN_CENTER_POSITION]
         self.body_color = body_color
-        super().__init__(body_color=body_color, position=self.positions[0])
+        self.positions: list[POINTER_POSITION] = [SCREEN_CENTER_POSITION]
+        self.length: int = 1
+        self.direction: POINTER_POSITION = RIGHT
+        self.next_direction: Optional[POINTER_POSITION] = None
+        self.last: Optional[POINTER_POSITION] = None
+        super().__init__(
+            body_color=body_color,
+            position=self.get_head_position()
+        )
 
     def update_direction(self) -> None:
         """Метод обновляет направление движения змейки."""
